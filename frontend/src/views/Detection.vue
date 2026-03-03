@@ -42,13 +42,13 @@
               <span v-else>{{ getModeTitle() }}</span>
               <!-- header 右侧操作 -->
               <div class="header-actions">
-                <el-button
+                <!-- <el-button
                   v-if="detectionMode === 'image'"
                   @click="generateExample"
                 >
                   <el-icon><Refresh /></el-icon>
                   生成示例
-                </el-button>
+                </el-button> -->
                 <el-button 
                   v-if="detectionMode === 'camera' && !isCameraActive"
                   type="primary" 

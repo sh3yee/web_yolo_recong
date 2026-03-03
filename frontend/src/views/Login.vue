@@ -4,11 +4,12 @@
       <div class="system-title">
         <h1>【YOLO检测识别系统】</h1>
       </div>
-      
-      <div class="login-form-container">
-        <div class="form-header">
+
+      <!-- 登录表单 -->
+      <div v-if="!showRegister" class="login-form-container">
+        <!-- <div class="form-header">
           <h2>多模态目标检测系统</h2>
-        </div>
+        </div> -->
         
         <el-form 
           ref="loginForm" 
@@ -54,55 +55,75 @@
         
         <div class="form-footer">
           <el-link @click="showRegister = true">注册账号</el-link>
-          <el-link>忘记密码</el-link>
+          <!-- <el-link>忘记密码</el-link> -->
         </div>
-        
-        <div class="footer-info">
+      </div>
+
+      <!-- 注册表单（与登录同一套卡片 UI） -->
+      <div v-else class="login-form-container">
+        <!-- <div class="form-header">
+          <h2>注册账号</h2>
+        </div> -->
+
+        <el-form
+          ref="registerForm"
+          :model="registerData"
+          :rules="registerRules"
+          class="login-form"
+          @keyup.enter="handleRegister"
+        >
+          <el-form-item prop="username">
+            <el-input
+              v-model="registerData.username"
+              placeholder="请输入用户名"
+              prefix-icon="User"
+              size="large"
+              clearable
+            />
+          </el-form-item>
+
+          <el-form-item prop="password">
+            <el-input
+              v-model="registerData.password"
+              type="password"
+              placeholder="请输入密码"
+              prefix-icon="Lock"
+              size="large"
+              show-password
+              clearable
+            />
+          </el-form-item>
+
+          <el-form-item prop="confirmPassword">
+            <el-input
+              v-model="registerData.confirmPassword"
+              type="password"
+              placeholder="请确认密码"
+              prefix-icon="Lock"
+              size="large"
+              show-password
+              clearable
+            />
+          </el-form-item>
+
+          <el-form-item>
+            <el-button
+              type="primary"
+              size="large"
+              class="login-button"
+              :loading="$store.state.isLoading"
+              @click="handleRegister"
+            >
+              注册
+            </el-button>
+          </el-form-item>
+        </el-form>
+
+        <div class="form-footer">
+          <el-link @click="showRegister = false">返回登录</el-link>
         </div>
       </div>
     </div>
-    
-    <!-- 注册对话框 -->
-    <el-dialog v-model="showRegister" title="用户注册" width="400px">
-      <el-form 
-        ref="registerForm" 
-        :model="registerData" 
-        :rules="registerRules"
-      >
-        <el-form-item label="用户名" prop="username">
-          <el-input v-model="registerData.username" placeholder="请输入用户名" />
-        </el-form-item>
-        
-        <el-form-item label="密码" prop="password">
-          <el-input 
-            v-model="registerData.password" 
-            type="password" 
-            placeholder="请输入密码" 
-            show-password 
-          />
-        </el-form-item>
-        
-        <el-form-item label="确认密码" prop="confirmPassword">
-          <el-input 
-            v-model="registerData.confirmPassword" 
-            type="password" 
-            placeholder="请确认密码" 
-            show-password 
-          />
-        </el-form-item>
-      </el-form>
-      
-      <template #footer>
-        <el-button @click="showRegister = false">取消</el-button>
-        <el-button 
-          type="primary" 
-          :loading="$store.state.isLoading"
-          @click="handleRegister"
-        >
-          注册
-        </el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 

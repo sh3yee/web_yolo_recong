@@ -22,7 +22,7 @@
           
           <el-menu-item index="/dashboard/history">
             <el-icon><Clock /></el-icon>
-            <span>检测历史</span>
+            <span>检测日志</span>
           </el-menu-item>
           
           <el-menu-item index="/dashboard/models">
@@ -106,7 +106,7 @@ export default {
     getPageTitle() {
       const routeMap = {
         '/dashboard/detection': '目标检测',
-        '/dashboard/history': '检测历史',
+        '/dashboard/history': '检测日志',
         '/dashboard/models': '模型管理'
       }
       return routeMap[this.$route.path] || '检测系统'
