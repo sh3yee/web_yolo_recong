@@ -33,7 +33,7 @@
       
       <div class="history-content">
         <!-- 统计信息 -->
-        <div class="stats-row" v-if="history.length > 0">
+        <!-- <div class="stats-row" v-if="history.length > 0">
           <el-row :gutter="20">
             <el-col :span="6">
               <el-statistic title="总检测次数" :value="history.length" />
@@ -49,7 +49,7 @@
             </el-col>
           </el-row>
         </div>
-        
+         -->
         <!-- 历史记录表格 -->
         <el-table 
           :data="paginatedHistory" 
