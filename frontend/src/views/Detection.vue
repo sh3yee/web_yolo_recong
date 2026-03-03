@@ -1,6 +1,6 @@
 <template>
   <div class="detection-container">
-    <!-- 检测方式选择 -->
+    <!-- 检测方式选择（已注释，默认使用图片检测）
     <el-card class="mode-selector" shadow="hover">
       <template #header>
         <div class="card-header">
@@ -23,53 +23,109 @@
         </el-radio-button>
       </el-radio-group>
     </el-card>
-    
+    -->
+
     <el-row :gutter="20">
       <!-- 左侧：上传和控制区域 -->
       <el-col :span="12">
         <el-card class="upload-card" shadow="hover">
           <template #header>
             <div class="card-header">
-              <span>{{ getModeTitle() }}</span>
-              <el-button 
-                v-if="detectionMode === 'camera' && !isCameraActive"
-                type="primary" 
-                @click="startCamera" 
-                :loading="$store.state.isLoading"
-              >
-                启动摄像头
-              </el-button>
-              <el-button 
-                v-if="detectionMode === 'camera' && isCameraActive"
-                type="danger" 
-                @click="stopCamera"
-              >
-                停止摄像头
-              </el-button>
+              <!-- 图片模式：多模态标题 -->
+              <div v-if="detectionMode === 'image'" class="multimodal-header-left">
+                <div class="multimodal-title">
+                  <el-icon class="multimodal-icon"><Upload /></el-icon>
+                  <span>多模态图像上传</span>
+                </div>
+                <div class="multimodal-subtitle">上传配对的 RGB 可见光图像与红外 IR 图像</div>
+              </div>
+              <span v-else>{{ getModeTitle() }}</span>
+              <!-- header 右侧操作 -->
+              <div class="header-actions">
+                <el-button
+                  v-if="detectionMode === 'image'"
+                  @click="generateExample"
+                >
+                  <el-icon><Refresh /></el-icon>
+                  生成示例
+                </el-button>
+                <el-button 
+                  v-if="detectionMode === 'camera' && !isCameraActive"
+                  type="primary" 
+                  @click="startCamera" 
+                  :loading="$store.state.isLoading"
+                >
+                  启动摄像头
+                </el-button>
+                <el-button 
+                  v-if="detectionMode === 'camera' && isCameraActive"
+                  type="danger" 
+                  @click="stopCamera"
+                >
+                  停止摄像头
+                </el-button>
+              </div>
             </div>
           </template>
           
-          <!-- 图片上传 -->
-          <div v-if="detectionMode === 'image'" class="upload-section">
-            <el-upload
-              class="image-uploader"
-              :action="uploadAction"
-              :show-file-list="false"
-              :before-upload="beforeImageUpload"
-              :on-success="handleImageSuccess"
-              :on-error="handleUploadError"
-              :data="{ user_id: $store.getters.currentUser?.id }"
-              drag
-            >
-              <div v-if="!imageUrl" class="upload-placeholder">
-                <el-icon class="upload-icon"><Plus /></el-icon>
-                <div class="upload-text">
-                  <p>拖拽图片到此处，或<em>点击上传</em></p>
-                  <p class="upload-tip">支持 JPG、PNG、GIF 格式，大小不超过 10MB</p>
-                </div>
-              </div>
-              <img v-else :src="imageUrl" class="uploaded-image" alt="上传的图片">
-            </el-upload>
+          <!-- 图片上传（双模态：RGB + IR） -->
+          <div v-if="detectionMode === 'image'" class="upload-section dual-upload-section">
+            <el-row :gutter="20">
+              <!-- RGB 可见光图像 -->
+              <el-col :span="12">
+                <div class="upload-label">RGB 可见光图像</div>
+                <el-upload
+                  class="dual-uploader"
+                  :class="{ 'uploader-active': rgbImageUrl }"
+                  :show-file-list="false"
+                  :auto-upload="false"
+                  :on-change="handleRgbChange"
+                  accept="image/*"
+                  drag
+                >
+                  <div v-if="!rgbImageUrl" class="dual-upload-placeholder">
+                    <div class="dual-upload-icon rgb-icon">
+                      <el-icon><Picture /></el-icon>
+                    </div>
+                    <p class="dual-upload-name">RGB 可见光图像</p>
+                    <p class="dual-upload-hint">拖放或点击上传</p>
+                    <p class="dual-upload-formats">JPG, PNG, GIF, WEBP</p>
+                  </div>
+                  <div v-else class="dual-upload-preview">
+                    <img :src="rgbImageUrl" class="preview-thumb" alt="RGB图像" />
+                    <p class="dual-upload-name">RGB 可见光图像</p>
+                    <p class="dual-upload-hint">点击重新上传</p>
+                  </div>
+                </el-upload>
+              </el-col>
+              <!-- IR 红外图像 -->
+              <el-col :span="12">
+                <div class="upload-label">IR 红外图像</div>
+                <el-upload
+                  class="dual-uploader"
+                  :class="{ 'uploader-active': irImageUrl }"
+                  :show-file-list="false"
+                  :auto-upload="false"
+                  :on-change="handleIrChange"
+                  accept="image/*"
+                  drag
+                >
+                  <div v-if="!irImageUrl" class="dual-upload-placeholder">
+                    <div class="dual-upload-icon ir-icon">
+                      <el-icon><Picture /></el-icon>
+                    </div>
+                    <p class="dual-upload-name">IR 红外图像</p>
+                    <p class="dual-upload-hint">拖放或点击上传</p>
+                    <p class="dual-upload-formats">JPG, PNG, GIF, WEBP</p>
+                  </div>
+                  <div v-else class="dual-upload-preview">
+                    <img :src="irImageUrl" class="preview-thumb" alt="IR图像" />
+                    <p class="dual-upload-name">IR 红外图像</p>
+                    <p class="dual-upload-hint">点击重新上传</p>
+                  </div>
+                </el-upload>
+              </el-col>
+            </el-row>
           </div>
           
           <!-- 视频上传 -->
@@ -360,7 +416,9 @@ import {
   RefreshRight,
   ZoomIn,
   ZoomOut,
-  Download
+  Download,
+  Upload,
+  Refresh
 } from '@element-plus/icons-vue'
 
 export default {
@@ -374,12 +432,18 @@ export default {
     RefreshRight,
     ZoomIn,
     ZoomOut,
-    Download
+    Download,
+    Upload,
+    Refresh
   },
   data() {
     return {
       detectionMode: 'image',
       imageUrl: '',
+      rgbImageUrl: '',
+      irImageUrl: '',
+      rgbFile: null,
+      irFile: null,
       videoUrl: '',
       isCameraActive: false,
       detectionResult: {},
@@ -403,7 +467,7 @@ export default {
   },
   computed: {
     canDetect() {
-      return (this.detectionMode === 'image' && this.imageUrl) || 
+      return (this.detectionMode === 'image' && this.rgbImageUrl && this.irImageUrl) || 
              (this.detectionMode === 'video' && this.videoUrl)
     }
   },
@@ -425,27 +489,38 @@ export default {
     },
     
     // 图片上传相关
+    handleRgbChange(file) {
+      const isImage = file.raw.type.startsWith('image/')
+      if (!isImage) { ElMessage.error('只能上传图片文件!'); return }
+      if (this.rgbImageUrl && this.rgbImageUrl.startsWith('blob:')) URL.revokeObjectURL(this.rgbImageUrl)
+      this.rgbFile = file.raw
+      this.rgbImageUrl = URL.createObjectURL(file.raw)
+    },
+
+    handleIrChange(file) {
+      const isImage = file.raw.type.startsWith('image/')
+      if (!isImage) { ElMessage.error('只能上传图片文件!'); return }
+      if (this.irImageUrl && this.irImageUrl.startsWith('blob:')) URL.revokeObjectURL(this.irImageUrl)
+      this.irFile = file.raw
+      this.irImageUrl = URL.createObjectURL(file.raw)
+    },
+
+    generateExample() {
+      ElMessage.info('示例功能暂未实现')
+    },
+
+    // 旧单图上传保留（供视频/摄像头模式使用）
     beforeImageUpload(file) {
       const isImage = file.type.startsWith('image/')
       const isLt10M = file.size / 1024 / 1024 < 10
-      
-      if (!isImage) {
-        ElMessage.error('只能上传图片文件!')
-        return false
-      }
-      if (!isLt10M) {
-        ElMessage.error('图片大小不能超过 10MB!')
-        return false
-      }
-      
-      // 保存图片URL用于预览
+      if (!isImage) { ElMessage.error('只能上传图片文件!'); return false }
+      if (!isLt10M) { ElMessage.error('图片大小不能超过 10MB!'); return false }
       this.imageUrl = URL.createObjectURL(file)
       return true
     },
     
     handleImageSuccess(response) {
       if (response.success) {
-        // 确保结果稳定显示
         this.detectionResult = { ...response }
         ElMessage.success('图片检测完成')
       } else {
@@ -628,23 +703,52 @@ export default {
     
     // 检测相关
     async startDetection() {
-      if (this.detectionMode === 'image' && this.imageUrl) {
-        ElMessage.info('请重新上传图片以触发检测')
+      if (this.detectionMode === 'image') {
+        if (!this.rgbFile || !this.irFile) {
+          ElMessage.warning('请先上传 RGB 和 IR 两张图片')
+          return
+        }
+        const formData = new FormData()
+        formData.append('rgb_image', this.rgbFile)
+        formData.append('ir_image', this.irFile)
+        if (this.$store.getters.currentUser?.id) {
+          formData.append('user_id', this.$store.getters.currentUser.id)
+        }
+        this.$store.commit('setLoading', true)
+        try {
+          const response = await fetch('/api/detect_image', {
+            method: 'POST',
+            body: formData
+          })
+          const result = await response.json()
+          if (result.success) {
+            this.detectionResult = { ...result }
+            ElMessage.success('图片检测完成')
+          } else {
+            ElMessage.error(result.message || '检测失败')
+          }
+        } catch (error) {
+          ElMessage.error('检测请求失败: ' + error.message)
+        } finally {
+          this.$store.commit('setLoading', false)
+        }
       } else if (this.detectionMode === 'video' && this.videoUrl) {
         ElMessage.info('请重新上传视频以触发检测')
       }
     },
     
     resetUpload() {
-      // 清理旧的URL
-      if (this.imageUrl && this.imageUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(this.imageUrl)
-      }
-      if (this.videoUrl && this.videoUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(this.videoUrl)
-      }
+      // 清理旧的 URL
+      if (this.imageUrl && this.imageUrl.startsWith('blob:')) URL.revokeObjectURL(this.imageUrl)
+      if (this.rgbImageUrl && this.rgbImageUrl.startsWith('blob:')) URL.revokeObjectURL(this.rgbImageUrl)
+      if (this.irImageUrl && this.irImageUrl.startsWith('blob:')) URL.revokeObjectURL(this.irImageUrl)
+      if (this.videoUrl && this.videoUrl.startsWith('blob:')) URL.revokeObjectURL(this.videoUrl)
       
       this.imageUrl = ''
+      this.rgbImageUrl = ''
+      this.irImageUrl = ''
+      this.rgbFile = null
+      this.irFile = null
       this.videoUrl = ''
       this.detectionResult = {}
     },
@@ -830,6 +934,149 @@ export default {
 
 .upload-card, .result-card {
   min-height: 600px;
+}
+
+/* 多模态 header */
+.multimodal-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.multimodal-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.multimodal-icon {
+  color: #409eff;
+  font-size: 18px;
+}
+
+.multimodal-subtitle {
+  font-size: 12px;
+  color: #909399;
+  font-weight: 400;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 双图上传 */
+.dual-upload-section {
+  margin-bottom: 20px;
+}
+
+.upload-label {
+  font-size: 13px;
+  color: #606266;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.dual-uploader {
+  width: 100%;
+}
+
+.dual-uploader :deep(.el-upload) {
+  width: 100%;
+}
+
+.dual-uploader :deep(.el-upload-dragger) {
+  width: 100%;
+  height: 240px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed #d9d9d9;
+  border-radius: 10px;
+  background: #fafafa;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.dual-uploader :deep(.el-upload-dragger:hover) {
+  border-color: #409eff;
+  background: #f0f7ff;
+}
+
+.uploader-active :deep(.el-upload-dragger) {
+  border-color: #67c23a;
+  background: #f0faf0;
+}
+
+.dual-upload-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.dual-upload-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  margin-bottom: 4px;
+}
+
+.rgb-icon {
+  background: linear-gradient(135deg, #c845e8, #e86845);
+  color: #fff;
+}
+
+.ir-icon {
+  background: linear-gradient(135deg, #e85c45, #e8a045);
+  color: #fff;
+}
+
+.dual-upload-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+  margin: 0;
+}
+
+.dual-upload-hint {
+  font-size: 12px;
+  color: #909399;
+  margin: 0;
+}
+
+.dual-upload-formats {
+  font-size: 11px;
+  color: #c0c4cc;
+  background: #f5f7fa;
+  padding: 2px 10px;
+  border-radius: 4px;
+  margin: 0;
+}
+
+.dual-upload-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px;
+}
+
+.preview-thumb {
+  max-width: 100%;
+  max-height: 150px;
+  border-radius: 6px;
+  object-fit: cover;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
 }
 
 .upload-section {
