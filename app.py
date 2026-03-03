@@ -169,78 +169,150 @@ def register():
 
 @app.route('/api/detect_image', methods=['POST'])
 def detect_image():
-    if 'file' not in request.files:
-        return jsonify({'success': False, 'message': '没有上传文件'}), 400
-    
-    file = request.files['file']
+    """
+    支持双模态检测（rgb_image + ir_image）和单图兼容模式（file）。
+    双模态模式：分别对 RGB 和 IR 两张图推理，NMS 融合结果，输出左右拼接对比图。
+    YOLO11 / YOLOv8 均通过 ultralytics YOLO() 加载，无需区分版本。
+    """
+    # 优先使用双模态字段，兼容旧版单图字段
+    rgb_file = request.files.get('rgb_image') or request.files.get('file')
+    ir_file = request.files.get('ir_image')
     user_id = request.form.get('user_id', 1)
-    
-    if file.filename == '':
-        return jsonify({'success': False, 'message': '没有选择文件'}), 400
-    
-    if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
-        filename = timestamp + filename
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(filepath)
-        
-        # 进行YOLO检测
-        try:
-            results = model(filepath)
-            
-            # 处理检测结果
-            detections = []
-            img = cv2.imread(filepath)
-            
+    dual_mode = ir_file is not None
+
+    if rgb_file is None or rgb_file.filename == '':
+        return jsonify({'success': False, 'message': '没有上传 RGB 图像'}), 400
+    if not allowed_file(rgb_file.filename):
+        return jsonify({'success': False, 'message': 'RGB 图像格式不支持'}), 400
+    if dual_mode and not allowed_file(ir_file.filename):
+        return jsonify({'success': False, 'message': 'IR 图像格式不支持'}), 400
+
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
+
+    # 保存 RGB 图像
+    rgb_filename = timestamp + 'rgb_' + secure_filename(rgb_file.filename)
+    rgb_filepath = os.path.join(app.config['UPLOAD_FOLDER'], rgb_filename)
+    rgb_file.save(rgb_filepath)
+
+    try:
+        rgb_img = cv2.imread(rgb_filepath)
+
+        def collect_raw_dets(results):
+            """从 YOLO 结果中提取原始检测框列表"""
+            dets = []
             for r in results:
-                boxes = r.boxes
-                if boxes is not None:
-                    for box in boxes:
-                        x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
-                        conf = box.conf[0].cpu().numpy()
-                        cls = box.cls[0].cpu().numpy()
-                        
-                        detections.append({
-                            'class': model.names[int(cls)],
-                            'confidence': float(conf),
-                            'bbox': [float(x1), float(y1), float(x2), float(y2)]
-                        })
-                        
-                        # 在图像上绘制检测框
-                        cv2.rectangle(img, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
-                        cv2.putText(img, f'{model.names[int(cls)]}: {conf:.2f}', 
-                                  (int(x1), int(y1)-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-            
-            # 保存结果图像
-            result_filename = 'result_' + filename
-            result_filepath = os.path.join('static', result_filename)
-            cv2.imwrite(result_filepath, img)
-            
-            # 保存到数据库
-            detection_result = DetectionResult(
-                user_id=user_id,
-                detection_type='image',
-                original_file=filename,
-                result_file=result_filename,
-                detections=json.dumps(detections),
-                confidence=max([d['confidence'] for d in detections]) if detections else 0
-            )
-            db.session.add(detection_result)
-            db.session.commit()
-            
-            return jsonify({
-                'success': True,
-                'message': '检测完成',
-                'detections': detections,
-                'result_image': f'/static/{result_filename}',
-                'detection_count': len(detections)
-            })
-            
-        except Exception as e:
-            return jsonify({'success': False, 'message': f'检测失败: {str(e)}'}), 500
-    
-    return jsonify({'success': False, 'message': '不支持的文件格式'}), 400
+                if r.boxes is not None:
+                    for box in r.boxes:
+                        x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().tolist()
+                        conf = float(box.conf[0].cpu().numpy())
+                        cls  = int(box.cls[0].cpu().numpy())
+                        dets.append((x1, y1, x2, y2, conf, cls))
+            return dets
+
+        if dual_mode:
+            # ── 保存 IR 图像 ────────────────────────────
+            ir_filename = timestamp + 'ir_' + secure_filename(ir_file.filename)
+            ir_filepath  = os.path.join(app.config['UPLOAD_FOLDER'], ir_filename)
+            ir_file.save(ir_filepath)
+            ir_img = cv2.imread(ir_filepath)
+
+            # 将 IR resize 到与 RGB 相同尺寸
+            if ir_img.shape[:2] != rgb_img.shape[:2]:
+                ir_img = cv2.resize(ir_img, (rgb_img.shape[1], rgb_img.shape[0]))
+
+            # ── 分别推理 ─────────────────────────────────
+            rgb_dets = collect_raw_dets(model(rgb_filepath))
+            ir_dets  = collect_raw_dets(model(ir_filepath))
+
+            # ── NMS 融合两路结果 ─────────────────────────
+            all_boxes  = [[int(x1), int(y1), int(x2 - x1), int(y2 - y1)]
+                          for x1, y1, x2, y2, _, _ in rgb_dets + ir_dets]
+            all_scores = [conf for _, _, _, _, conf, _ in rgb_dets + ir_dets]
+            all_cls    = [cls  for _, _, _, _, _, cls  in rgb_dets + ir_dets]
+
+            detections = []
+            if all_boxes:
+                indices = cv2.dnn.NMSBoxes(all_boxes, all_scores,
+                                           score_threshold=0.25, nms_threshold=0.45)
+                indices = indices.flatten() if len(indices) > 0 else []
+                for i in indices:
+                    x, y, w, h = all_boxes[i]
+                    cls  = all_cls[i]
+                    conf = all_scores[i]
+                    detections.append({
+                        'class': model.names[cls],
+                        'confidence': conf,
+                        'bbox': [float(x), float(y), float(x + w), float(y + h)]
+                    })
+                    # 在 RGB 结果图上绘制融合后的框（绿色）
+                    cv2.rectangle(rgb_img, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                    cv2.putText(rgb_img, f'{model.names[cls]}: {conf:.2f}',
+                                (x, max(y - 10, 10)),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+            # 在 IR 图上单独绘制 IR 检测框（橙色）供对比展示
+            ir_display = ir_img.copy()
+            for x1, y1, x2, y2, conf, cls in ir_dets:
+                cv2.rectangle(ir_display, (int(x1), int(y1)), (int(x2), int(y2)), (0, 128, 255), 2)
+                cv2.putText(ir_display, f'{model.names[cls]}: {conf:.2f}',
+                            (int(x1), max(int(y1) - 10, 10)),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 128, 255), 2)
+
+            # ── 拼接左（RGB结果）右（IR结果）对比图 ────────
+            h, w = rgb_img.shape[:2]
+            title_bar = np.zeros((30, w * 2, 3), dtype=np.uint8)
+            cv2.putText(title_bar, 'RGB Result',  (10,     22),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255,   0), 2)
+            cv2.putText(title_bar, 'IR Result',   (w + 10, 22),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 128, 255), 2)
+            combined = np.vstack([title_bar, np.hstack([rgb_img, ir_display])])
+
+            result_filename = 'result_' + rgb_filename
+            result_filepath  = os.path.join('static', result_filename)
+            cv2.imwrite(result_filepath, combined)
+
+        else:
+            # ── 单图兼容模式（原逻辑）────────────────────
+            raw_dets   = collect_raw_dets(model(rgb_filepath))
+            detections = []
+            for x1, y1, x2, y2, conf, cls in raw_dets:
+                detections.append({
+                    'class': model.names[cls],
+                    'confidence': conf,
+                    'bbox': [x1, y1, x2, y2]
+                })
+                cv2.rectangle(rgb_img, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+                cv2.putText(rgb_img, f'{model.names[cls]}: {conf:.2f}',
+                            (int(x1), max(int(y1) - 10, 10)),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+            result_filename = 'result_' + rgb_filename
+            result_filepath  = os.path.join('static', result_filename)
+            cv2.imwrite(result_filepath, rgb_img)
+
+        # ── 保存到数据库 ──────────────────────────────
+        detection_record = DetectionResult(
+            user_id=user_id,
+            detection_type='image',
+            original_file=rgb_filename,
+            result_file=result_filename,
+            detections=json.dumps(detections),
+            confidence=max([d['confidence'] for d in detections]) if detections else 0
+        )
+        db.session.add(detection_record)
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': '检测完成',
+            'detections': detections,
+            'result_image': f'/static/{result_filename}',
+            'detection_count': len(detections)
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': f'检测失败: {str(e)}'}), 500
 
 @app.route('/api/detect_video', methods=['POST'])
 def detect_video():
