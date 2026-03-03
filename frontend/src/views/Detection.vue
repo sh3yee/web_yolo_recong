@@ -202,7 +202,7 @@
               <el-icon><Search /></el-icon>
               开始检测
             </el-button>
-            <el-button @click="resetUpload">
+            <el-button size="large" @click="resetUpload">
               <el-icon><RefreshRight /></el-icon>
               重新上传
             </el-button>
@@ -912,7 +912,8 @@ export default {
 
 <style scoped>
 .detection-container {
-  max-width: 1400px;
+  /* max-width: 1400px; */
+  width: 100%;
   margin: 0 auto;
 }
 

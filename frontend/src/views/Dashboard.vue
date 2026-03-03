@@ -4,7 +4,7 @@
       <!-- 侧边栏 -->
       <el-aside width="250px" class="sidebar">
         <div class="logo">
-          <h2>🔍 多模态目标检测系统</h2>
+          <h2>多模态目标检测系统</h2>
         </div>
         
         <el-menu

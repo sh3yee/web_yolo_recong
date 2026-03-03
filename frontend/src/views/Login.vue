@@ -220,79 +220,68 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background-image: url('../assets/bg.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   padding: 20px;
 }
 
 .login-card {
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 20px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(10px);
-  overflow: hidden;
+  background: #ffffff;
+  border-radius: 4px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
   width: 100%;
-  max-width: 450px;
+  max-width: 400px;
+  overflow: hidden;
 }
 
 .system-title {
-  background: linear-gradient(135deg, #ff6b6b, #ff8e53);
-  color: white;
+  background-color: #1a3a5c;
+  color: #fff;
   text-align: center;
-  padding: 20px;
-  margin: 0;
+  padding: 18px 20px;
 }
 
 .system-title h1 {
   margin: 0;
-  font-size: 24px;
-  font-weight: bold;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 1px;
 }
 
 .login-form-container {
-  padding: 40px;
+  padding: 36px 40px 28px;
 }
 
 .form-header {
   text-align: center;
-  margin-bottom: 30px;
+  margin-bottom: 28px;
 }
 
 .form-header h2 {
-  color: #333;
-  font-size: 18px;
-  margin-bottom: 10px;
-  font-weight: 600;
-}
-
-.subtitle {
-  color: #666;
-  font-size: 12px;
+  color: #303133;
+  font-size: 16px;
+  font-weight: 500;
   margin: 0;
 }
 
 .login-form {
-  margin-bottom: 20px;
+  margin-bottom: 8px;
 }
 
 .login-button {
   width: 100%;
-  height: 45px;
-  font-size: 16px;
-  font-weight: 600;
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  border: none;
-  border-radius: 8px;
-}
-
-.login-button:hover {
-  background: linear-gradient(135deg, #5a6fd8, #6a42a0);
+  height: 40px;
+  font-size: 15px;
+  font-weight: 500;
 }
 
 .form-footer {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 20px;
+  margin-bottom: 0;
+  padding-top: 4px;
 }
 
 .footer-info {
@@ -302,12 +291,6 @@ export default {
 }
 
 :deep(.el-input__wrapper) {
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-:deep(.el-input__inner) {
-  height: 45px;
-  line-height: 45px;
+  border-radius: 3px;
 }
 </style> 

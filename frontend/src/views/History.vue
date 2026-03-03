@@ -514,7 +514,8 @@ export default {
 
 <style scoped>
 .history-container {
-  max-width: 1400px;
+  /* max-width: 1400px; */
+  width: 100%;
   margin: 0 auto;
 }
 
